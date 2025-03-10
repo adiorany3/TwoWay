@@ -45,7 +45,7 @@ def create_tukey_analysis(data, factor, dependent_var, alpha):
     st.plotly_chart(fig, use_container_width=True)
     
     # Bar plot with error bars
-    summary_stats = data.groupby(factor)[dependent_var].agg(['mean', 'std']).reset_index()
+    summary_stats = data.groupby(factor, observed=True)[dependent_var].agg(['mean', 'std']).reset_index()
     
     fig = px.bar(
         summary_stats,
@@ -71,7 +71,7 @@ def create_docx_report(data, dependent_var, factor1, factor2, formatted_anova, e
     doc.add_paragraph(f'Factor 1: {factor1}')
     doc.add_paragraph(f'Factor 2: {factor2}')
     doc.add_paragraph(f'Significance level (α): {alpha}')
-    doc.add_parraph(f'Sample size: {len(data)}')
+    doc.add_paragraph(f'Sample size: {len(data)}')
     
     # ANOVA Table
     doc.add_heading('ANOVA Results', 1)
@@ -499,9 +499,9 @@ if uploaded_file is not None:
                     'Eta²': eta_squared[:-1].values,
                     'Partial Eta²': partial_eta_squared.values,
                     'Efek': [
-                        "Besar" if eta_squared[0] >= 0.14 else "Sedang" if eta_squared[0] >= 0.06 else "Kecil",
-                        "Besar" if eta_squared[1] >= 0.14 else "Sedang" if eta_squared[1] >= 0.06 else "Kecil",
-                        "Besar" if eta_squared[2] >= 0.14 else "Sedang" if eta_squared[2] >= 0.06 else "Kecil"
+                        "Besar" if eta_squared.iloc[0] >= 0.14 else "Sedang" if eta_squared.iloc[0] >= 0.06 else "Kecil",
+                        "Besar" if eta_squared.iloc[1] >= 0.14 else "Sedang" if eta_squared.iloc[1] >= 0.06 else "Kecil",
+                        "Besar" if eta_squared.iloc[2] >= 0.14 else "Sedang" if eta_squared.iloc[2] >= 0.06 else "Kecil"
                     ]
                 })
                 
@@ -578,24 +578,24 @@ if uploaded_file is not None:
                 st.write("## Uji Post-hoc")
                 
                 # Jalankan Tukey HSD untuk efek utama yang signifikan
-                if p_values[0] < alpha:
+                if p_values.iloc[0] < alpha:
                     st.write(f"### Tukey HSD untuk {factor1}")
                     create_tukey_analysis(data, factor1, dependent_var, alpha)
                 else:
-                    st.info(f"Faktor {factor1} tidak memiliki efek yang signifikan (p = {p_values[0]:.4f} > {alpha}).")
+                    st.info(f"Faktor {factor1} tidak memiliki efek yang signifikan (p = {p_values.iloc[0]:.4f} > {alpha}).")
                 
-                if p_values[1] < alpha:
+                if p_values.iloc[1] < alpha:
                     st.write(f"### Tukey HSD untuk {factor2}")
                     create_tukey_analysis(data, factor2, dependent_var, alpha)
                 else:
-                    st.info(f"Faktor {factor2} tidak memiliki efek yang signifikan (p = {p_values[1]:.4f} > {alpha}).")
+                    st.info(f"Faktor {factor2} tidak memiliki efek yang signifikan (p = {p_values.iloc[1]:.4f} > {alpha}).")
                 
                 # Jika interaksi signifikan, tampilkan plot interaksi
-                if p_values[2] < alpha:
+                if p_values.iloc[2] < alpha:
                     st.write("### Visualisasi Efek Interaksi")
                     
                     # Plot interaksi dengan plotly
-                    interaction_data = data.groupby([factor1, factor2])[dependent_var].mean().reset_index()
+                    interaction_data = data.groupby([factor1, factor2], observed=True)[dependent_var].mean().reset_index()
                     
                     fig = px.line(
                         interaction_data, 
@@ -633,7 +633,7 @@ if uploaded_file is not None:
                         - Heatmap menunjukkan kombinasi kedua faktor yang menghasilkan nilai tertinggi dan terendah pada variabel dependen.
                     """)
                 else:
-                    st.info(f"Interaksi antara {factor1} dan {factor2} tidak signifikan (p = {p_values[2]:.4f} > {alpha}).")
+                    st.info(f"Interaksi antara {factor1} dan {factor2} tidak signifikan (p = {p_values.iloc[2]:.4f} > {alpha}).")
                 
                 # Kesimpulan
                 st.write("## Kesimpulan")
@@ -641,20 +641,20 @@ if uploaded_file is not None:
                 # Buat kesimpulan berdasarkan hasil ANOVA
                 conclusions = []
                 
-                if p_values[0] < alpha:
-                    conclusions.append(f"- **{factor1}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[0]):.4f}, η² = {eta_squared[0]:.4f}).")
+                if p_values.iloc[0] < alpha:
+                    conclusions.append(f"- **{factor1}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[0]):.4f}, η² = {eta_squared.iloc[0]:.4f}).")
                 else:
-                    conclusions.append(f"- **{factor1}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[0]):.4f}).")
+                    conclusions.append(f"- **{factor1}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[0])::.4f}).")
                 
-                if p_values[1] < alpha:
-                    conclusions.append(f"- **{factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[1]):.4f}, η² = {eta_squared[1]:.4f}).")
+                if p_values.iloc[1] < alpha:
+                    conclusions.append(f"- **{factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1]):.4f}, η² = {eta_squared.iloc[1]:.4f}).")
                 else:
-                    conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[1]):.4f}).")
+                    conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1])::.4f}).")
                 
-                if p_values[2] < alpha:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2]):.4f}, η² = {eta_squared[2]:.4f}).")
+                if p_values.iloc[2] < alpha:
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
                 else:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2]):.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2])::.4f}).")
                 
                 for conclusion in conclusions:
                     st.markdown(conclusion)
@@ -681,7 +681,7 @@ if uploaded_file is not None:
                 with export_col2:
                     # Excel export option
                     excel_buffer = io.BytesIO()
-                    with pd.ExcelWriter(excel_buffer) as writer:
+                    with pd.ExcelWriter(exel_buffer) as writer:
                         formatted_anova.to_excel(writer, sheet_name="ANOVA Table", index=True)
                         effects_summary.to_excel(writer, sheet_name="Effect Sizes", index=False)
                         
