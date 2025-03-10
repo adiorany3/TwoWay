@@ -189,6 +189,53 @@ def create_html_report(dependent_var, factor1, factor2, formatted_anova, effects
     
     return html
 
+def validate_and_clean_data(data, dependent_var, factor1, factor2):
+    """
+    Validate and clean data for ANOVA analysis by removing NaN/Inf values
+    and checking for appropriate group sizes.
+    
+    Returns:
+        tuple: (clean_data, validation_message)
+    """
+    validation_message = []
+    
+    # Check for NaN/Inf in the dependent variable
+    invalid_values = data[dependent_var].isna() | np.isinf(data[dependent_var])
+    if invalid_values.any():
+        rows_with_invalid = invalid_values.sum()
+        validation_message.append(f"Removed {rows_with_invalid} rows with NaN or Inf values in {dependent_var}.")
+        data = data[~invalid_values]
+    
+    # Check for NaN in the factors
+    for factor in [factor1, factor2]:
+        invalid_factor = data[factor].isna()
+        if invalid_factor.any():
+            rows_with_invalid = invalid_factor.sum()
+            validation_message.append(f"Removed {rows_with_invalid} rows with NaN values in {factor}.")
+            data = data[~invalid_factor]
+    
+    # Check minimum group size
+    group_sizes = data.groupby([factor1, factor2]).size()
+    min_group_size = group_sizes.min()
+    if min_group_size < 3:
+        validation_message.append(f"Warning: Some groups have fewer than 3 observations (minimum: {min_group_size}).")
+        small_groups = group_sizes[group_sizes < 3].reset_index()
+        for _, row in small_groups.iterrows():
+            validation_message.append(f"  - Group {factor1}={row[factor1]}, {factor2}={row[factor2]} has only {row[0]} observation(s).")
+    
+    # Check if any groups have zero variance
+    zero_var_groups = []
+    for name, group in data.groupby([factor1, factor2]):
+        if group[dependent_var].var() == 0:
+            zero_var_groups.append(name)
+    
+    if zero_var_groups:
+        validation_message.append(f"Warning: Some groups have zero variance in {dependent_var}:")
+        for group in zero_var_groups:
+            validation_message.append(f"  - Group {factor1}={group[0]}, {factor2}={group[1]}")
+    
+    return data, validation_message
+
 # Set page configuration
 st.set_page_config(
     page_title="Analisis Two-Way ANOVA",
@@ -373,8 +420,12 @@ if uploaded_file is not None:
                         for f2 in data[factor2].unique():
                             subset = data[(data[factor1] == f1) & (data[factor2] == f2)][dependent_var]
                             if not subset.empty and len(subset) >= 3:  # Shapiro-Wilk membutuhkan minimal 3 nilai
-                                stat, p = stats.shapiro(subset)
-                                groups.append((f1, f2, stat, p, p > alpha))
+                                try:
+                                    stat, p = stats.shapiro(subset)
+                                    groups.append((f1, f2, stat, p, p > alpha))
+                                except Exception as e:
+                                    st.warning(f"Could not perform Shapiro-Wilk test on group {f1}, {f2}: {str(e)}")
+                                    # Skip this group but continue with others
                     
                     if groups:
                         assumption_df = pd.DataFrame(groups, columns=['Faktor 1', 'Faktor 2', 'Statistik', 'P-value', 'Normal'])
@@ -428,8 +479,13 @@ if uploaded_file is not None:
                 
                 # Gunakan kolom yang sudah diganti nama dalam formula
                 formula = "dependent_var ~ C(factor1) + C(factor2) + C(factor1):C(factor2)"
-                model = ols(formula, data=temp_data).fit()
-                anova_table = sm.stats.anova_lm(model, typ=2)
+                try:
+                    model = ols(formula, data=temp_data).fit()
+                    anova_table = sm.stats.anova_lm(model, typ=2)
+                except Exception as e:
+                    st.error(f"ANOVA calculation failed: {str(e)}")
+                    st.info("This may be due to perfect multicollinearity, empty groups, or non-finite values in the data.")
+                    st.stop()
                 
                 # Format tabel ANOVA
                 anova_display = anova_table.copy()
@@ -654,7 +710,7 @@ if uploaded_file is not None:
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
                 else:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2])::.4f}).")
                 
                 for conclusion in conclusions:
                     st.markdown(conclusion)
