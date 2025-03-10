@@ -77,9 +77,17 @@ def perform_bonferroni(data, factor, dependent_var, alpha):
 
 def perform_scheffe(data, factor, dependent_var, alpha):
     """Perform Scheffé test"""
-    # Fit ANOVA model
-    formula = f"{dependent_var} ~ C({factor})"
-    model = ols(formula, data=data).fit()
+    # Create a copy with renamed columns to avoid keyword issues
+    temp_data = data.copy()
+    column_mapping = {
+        dependent_var: 'dependent_var',
+        factor: 'factor'
+    }
+    temp_data = temp_data.rename(columns=column_mapping)
+    
+    # Fit ANOVA model with renamed columns
+    formula = "dependent_var ~ C(factor)"
+    model = ols(formula, data=temp_data).fit()
     anova_results = sm.stats.anova_lm(model, typ=2)
     
     # Get MSE and degrees of freedom
@@ -545,6 +553,14 @@ if uploaded_file is not None:
             })
             st.write(buffer)
 
+        # Add this after loading the data but before analysis
+        problem_columns = check_column_names(data)
+        if problem_columns:
+            st.warning("Data Anda memiliki nama kolom yang dapat menyebabkan masalah:")
+            for issue in problem_columns:
+                st.write(f"- {issue}")
+            st.write("Pertimbangkan untuk mengganti nama kolom tersebut untuk kompatibilitas yang lebih baik.")
+
         # Pilih kolom untuk analisis dengan pengelompokan yang lebih jelas
         st.write("### Pemilihan Variabel")
         
@@ -985,7 +1001,7 @@ if uploaded_file is not None:
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
                 else:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}).)
                 
                 for conclusion in conclusions:
                     st.markdown(conclusion)
