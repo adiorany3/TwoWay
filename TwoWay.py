@@ -967,7 +967,7 @@ if uploaded_file is not None:
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
                 else:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2])::.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}).")
                 
                 for conclusion in conclusions:
                     st.markdown(conclusion)
