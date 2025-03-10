@@ -413,6 +413,20 @@ def validate_and_clean_data(data, dependent_var, factor1, factor2):
     
     return data, validation_message
 
+# Add this function near the top of your file with the other utility functions
+def check_column_names(data):
+    """Check for Python reserved keywords and special characters in column names"""
+    import keyword
+    
+    problem_columns = []
+    for col in data.columns:
+        if keyword.iskeyword(col):
+            problem_columns.append(f"'{col}' is a Python reserved keyword")
+        if ' ' in col or '.' in col or '-' in col or any(c in col for c in '!"#$%&\'()*+,/:;<=>?@[\\]^`{|}~'):
+            problem_columns.append(f"'{col}' contains spaces or special characters")
+    
+    return problem_columns
+
 # Set page configuration
 st.set_page_config(
     page_title="Analisis Two-Way ANOVA",
@@ -609,6 +623,10 @@ if uploaded_file is not None:
                     factor2: 'factor2'
                 }
                 temp_data = temp_data.rename(columns=column_mapping)
+                
+                # Verify the column names have been changed
+                print(f"Original columns: {list(data.columns)}")
+                print(f"Temp data columns: {list(temp_data.columns)}")
                 
                 # Cek asumsi ANOVA jika diminta
                 if show_assumptions:
@@ -967,7 +985,7 @@ if uploaded_file is not None:
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
                 else:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2])::.4f}).")
                 
                 for conclusion in conclusions:
                     st.markdown(conclusion)
