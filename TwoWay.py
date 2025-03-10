@@ -9,7 +9,52 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy import stats
-import datetime  # Tambahkan import ini
+import datetime
+import io
+
+# Add these functions before your main code
+
+def format_p_value(p_value):
+    """Format p-value with appropriate precision based on magnitude"""
+    return f"{p_value:.4f}" if p_value >= 0.0001 else f"{p_value:.4e}"
+
+def create_tukey_analysis(data, factor, dependent_var, alpha):
+    """Perform Tukey HSD analysis for a factor"""
+    tukey = pairwise_tukeyhsd(endog=data[dependent_var], groups=data[factor], alpha=alpha)
+    
+    # Create table from Tukey results
+    tukey_results = pd.DataFrame(
+        data=tukey._results_table.data[1:],
+        columns=tukey._results_table.data[0]
+    )
+    
+    st.write(tukey_results)
+    
+    # Create visualizations
+    st.write(f"### Visualisasi Efek {factor}")
+    
+    # Boxplot
+    fig = px.box(
+        data, 
+        x=factor, 
+        y=dependent_var,
+        title=f"Boxplot {dependent_var} berdasarkan {factor}",
+        color=factor
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Bar plot with error bars
+    summary_stats = data.groupby(factor)[dependent_var].agg(['mean', 'std']).reset_index()
+    
+    fig = px.bar(
+        summary_stats,
+        x=factor,
+        y='mean',
+        error_y='std',
+        title=f"Rata-rata {dependent_var} berdasarkan {factor} (dengan standar deviasi)",
+        color=factor
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 # Set page configuration
 st.set_page_config(
@@ -64,6 +109,17 @@ if uploaded_file is not None:
             data = pd.read_csv(uploaded_file)
         elif file_extension in ['xlsx', 'xls']:
             data = pd.read_excel(uploaded_file)
+        
+        # Add this within your data processing section after reading the data
+
+        # Detect if dataset is large and offer sampling
+        if data.shape[0] > 10000:
+            st.warning(f"Dataset Anda cukup besar ({data.shape[0]} baris). Pertimbangkan untuk menggunakan sampel untuk analisis yang lebih cepat.")
+            use_sample = st.checkbox("Gunakan sampel data untuk analisis", True)
+            if use_sample:
+                sample_size = st.slider("Ukuran sampel", min_value=1000, max_value=min(10000, data.shape[0]), value=5000, step=1000)
+                data = data.sample(n=sample_size, random_state=42)
+                st.success(f"Menggunakan {sample_size} sampel data untuk analisis.")
         
         # Tampilkan informasi data
         col1, col2 = st.columns([2, 1])
@@ -127,6 +183,25 @@ if uploaded_file is not None:
         
         # Tombol untuk menjalankan analisis
         run_button = st.button("Jalankan Two-Way ANOVA", type="primary")
+        
+        # Add this after loading the data but before analysis
+
+        # Check for appropriate variable types
+        if run_button:
+            with st.spinner('Validasi data...'):
+                # Check minimum group size
+                min_group_size = data.groupby([factor1, factor2]).size().min()
+                if min_group_size < 3:
+                    st.warning(f"Beberapa kelompok memiliki ukuran sampel kurang dari 3 (minimum: {min_group_size}). Hasil ANOVA mungkin tidak reliable.")
+                
+                # Check if factors have adequate levels
+                if data[factor1].nunique() < 2:
+                    st.error(f"Faktor {factor1} harus memiliki minimal 2 level. Saat ini hanya memiliki {data[factor1].nunique()} level.")
+                    st.stop()
+                    
+                if data[factor2].nunique() < 2:
+                    st.error(f"Faktor {factor2} harus memiliki minimal 2 level. Saat ini hanya memiliki {data[factor2].nunique()} level.")
+                    st.stop()
         
         if run_button:
             with st.spinner('Sedang memproses...'):
@@ -372,79 +447,13 @@ if uploaded_file is not None:
                 # Jalankan Tukey HSD untuk efek utama yang signifikan
                 if p_values[0] < alpha:
                     st.write(f"### Tukey HSD untuk {factor1}")
-                    tukey = pairwise_tukeyhsd(endog=data[dependent_var], groups=data[factor1], alpha=alpha)
-                    
-                    # Buat tabel dari hasil Tukey
-                    tukey_results = pd.DataFrame(
-                        data=tukey._results_table.data[1:],
-                        columns=tukey._results_table.data[0]
-                    )
-                    
-                    st.write(tukey_results)
-                    
-                    # Buat visualisasi hasil dengan Plotly
-                    st.write(f"### Visualisasi Efek {factor1}")
-                    
-                    fig = px.box(
-                        data, 
-                        x=factor1, 
-                        y=dependent_var,
-                        title=f"Boxplot {dependent_var} berdasarkan {factor1}",
-                        color=factor1
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Tambahkan bar plot
-                    summary_stats = data.groupby(factor1)[dependent_var].agg(['mean', 'std']).reset_index()
-                    
-                    fig = px.bar(
-                        summary_stats,
-                        x=factor1,
-                        y='mean',
-                        error_y='std',
-                        title=f"Rata-rata {dependent_var} berdasarkan {factor1} (dengan standar deviasi)",
-                        color=factor1
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    create_tukey_analysis(data, factor1, dependent_var, alpha)
                 else:
                     st.info(f"Faktor {factor1} tidak memiliki efek yang signifikan (p = {p_values[0]:.4f} > {alpha}).")
                 
                 if p_values[1] < alpha:
                     st.write(f"### Tukey HSD untuk {factor2}")
-                    tukey = pairwise_tukeyhsd(endog=data[dependent_var], groups=data[factor2], alpha=alpha)
-                    
-                    # Buat tabel dari hasil Tukey
-                    tukey_results = pd.DataFrame(
-                        data=tukey._results_table.data[1:],
-                        columns=tukey._results_table.data[0]
-                    )
-                    
-                    st.write(tukey_results)
-                    
-                    # Buat visualisasi hasil dengan Plotly
-                    st.write(f"### Visualisasi Efek {factor2}")
-                    
-                    fig = px.box(
-                        data, 
-                        x=factor2, 
-                        y=dependent_var,
-                        title=f"Boxplot {dependent_var} berdasarkan {factor2}",
-                        color=factor2
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Tambahkan bar plot
-                    summary_stats = data.groupby(factor2)[dependent_var].agg(['mean', 'std']).reset_index()
-                    
-                    fig = px.bar(
-                        summary_stats,
-                        x=factor2,
-                        y='mean',
-                        error_y='std',
-                        title=f"Rata-rata {dependent_var} berdasarkan {factor2} (dengan standar deviasi)",
-                        color=factor2
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    create_tukey_analysis(data, factor2, dependent_var, alpha)
                 else:
                     st.info(f"Faktor {factor2} tidak memiliki efek yang signifikan (p = {p_values[1]:.4f} > {alpha}).")
                 
@@ -510,7 +519,7 @@ if uploaded_file is not None:
                     conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[1]):.4f}).")
                 
                 if p_values[2] < alpha:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2]):.4f}, η² = {eta_squared[2]:.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2])::.4f}, η² = {eta_squared[2]:.4f}).")
                 else:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2]):.4f}).")
                 
@@ -520,6 +529,36 @@ if uploaded_file is not None:
                 # Tambahkan R-squared
                 st.markdown(f"**Model menjelaskan {model.rsquared:.2%} dari variasi dalam {dependent_var}.**")
                 
+                # Add this after the analysis is complete
+
+                # Create export options
+                st.write("## Ekspor Hasil")
+                export_col1, export_col2 = st.columns(2)
+
+                with export_col1:
+                    # CSV export
+                    csv = formatted_anova.to_csv(index=True)
+                    st.download_button(
+                        label="Unduh Tabel ANOVA sebagai CSV",
+                        data=csv,
+                        file_name=f"anova_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+
+                with export_col2:
+                    # Excel export option
+                    excel_buffer = io.BytesIO()
+                    with pd.ExcelWriter(excel_buffer) as writer:
+                        formatted_anova.to_excel(writer, sheet_name="ANOVA Table", index=True)
+                        effects_summary.to_excel(writer, sheet_name="Effect Sizes", index=False)
+                        
+                    excel_data = excel_buffer.getvalue()
+                    st.download_button(
+                        label="Unduh Hasil sebagai Excel",
+                        data=excel_data,
+                        file_name=f"anova_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
         else:
             # Memberikan saran untuk pengguna baru
             st.info("Pilih variabel dan klik tombol 'Jalankan Two-Way ANOVA' untuk melihat hasil analisis.")
