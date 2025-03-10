@@ -5,7 +5,7 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 import matplotlib.pyplot as plt
 import seaborn as sns
-from statsmodels.stats.multicomp import pairwise_tukeyhsd
+from statsmodels.stats.multicomp import pairwise_tukeyhsd, MultiComparison
 import plotly.express as px
 import plotly.graph_objects as go
 from scipy import stats
@@ -19,17 +19,141 @@ def format_p_value(p_value):
     """Format p-value with appropriate precision based on magnitude"""
     return f"{p_value:.4f}" if p_value >= 0.0001 else f"{p_value:.4e}"
 
-def create_tukey_analysis(data, factor, dependent_var, alpha):
-    """Perform Tukey HSD analysis for a factor"""
+def perform_tukey_hsd(data, factor, dependent_var, alpha):
+    """Perform Tukey HSD test"""
     tukey = pairwise_tukeyhsd(endog=data[dependent_var], groups=data[factor], alpha=alpha)
-    
-    # Create table from Tukey results
-    tukey_results = pd.DataFrame(
+    results = pd.DataFrame(
         data=tukey._results_table.data[1:],
         columns=tukey._results_table.data[0]
     )
+    return results, "Tukey HSD"
+
+def perform_bonferroni(data, factor, dependent_var, alpha):
+    """Perform Bonferroni correction"""
+    mc = MultiComparison(data[dependent_var], data[factor])
+    results = mc.allpairtest(stats.ttest_ind, method='bonf')[0]
+    # Convert to DataFrame similar to Tukey output
+    df = pd.DataFrame(columns=['group1', 'group2', 'meandiff', 'p-adj', 'lower', 'upper', 'reject'])
+    for row in range(len(results.data)):
+        g1, g2 = results.data[row][0]
+        stat, p_adj, reject = results.data[row][1:]
+        # Calculate mean difference and confidence interval
+        group1_mean = data[data[factor] == g1][dependent_var].mean()
+        group2_mean = data[data[factor] == g2][dependent_var].mean()
+        meandiff = group1_mean - group2_mean
+        # Approximate CI - proper calculation would be more complex
+        t_val = stats.t.ppf(1 - alpha/2, len(data) - 2)
+        pooled_sd = np.sqrt(((data[data[factor] == g1][dependent_var].var() * (len(data[data[factor] == g1]) - 1) + 
+                             data[data[factor] == g2][dependent_var].var() * (len(data[data[factor] == g2]) - 1)) / 
+                             (len(data[data[factor] == g1]) + len(data[data[factor] == g2]) - 2)))
+        se = pooled_sd * np.sqrt(1/len(data[data[factor] == g1]) + 1/len(data[data[factor] == g2]))
+        margin = t_val * se
+        df.loc[row] = [g1, g2, meandiff, p_adj, meandiff - margin, meandiff + margin, reject]
+    return df, "Bonferroni"
+
+def perform_scheffe(data, factor, dependent_var, alpha):
+    """Perform Scheffé test"""
+    # Fit ANOVA model
+    formula = f"{dependent_var} ~ C({factor})"
+    model = ols(formula, data=data).fit()
+    anova_results = sm.stats.anova_lm(model, typ=2)
     
-    st.write(tukey_results)
+    # Get MSE and degrees of freedom
+    mse = anova_results.loc['Residual', 'sum_sq'] / anova_results.loc['Residual', 'df']
+    df_error = anova_results.loc['Residual', 'df']
+    
+    # Get all group combinations
+    groups = data[factor].unique()
+    combinations = [(g1, g2) for i, g1 in enumerate(groups) for g2 in groups[i+1:]]
+    
+    # Calculate Scheffé critical value
+    k = len(groups)  # number of groups
+    f_crit = stats.f.ppf(1-alpha, k-1, df_error) * (k-1)
+    
+    # Calculate pairwise comparisons
+    results = []
+    for g1, g2 in combinations:
+        n1 = len(data[data[factor] == g1])
+        n2 = len(data[data[factor] == g2])
+        mean1 = data[data[factor] == g1][dependent_var].mean()
+        mean2 = data[data[factor] == g2][dependent_var].mean()
+        meandiff = mean1 - mean2
+        
+        # Scheffé test statistic
+        se = np.sqrt(mse * (1/n1 + 1/n2))
+        scheffe_stat = meandiff**2 / (mse * (1/n1 + 1/n2) * (k-1))
+        p_val = 1 - stats.f.cdf(scheffe_stat, k-1, df_error)
+        
+        # Confidence interval
+        ci_margin = np.sqrt(f_crit) * se
+        lower = meandiff - ci_margin
+        upper = meandiff + ci_margin
+        
+        # Reject null if F statistic > F critical
+        reject = scheffe_stat > f_crit
+        
+        results.append([g1, g2, meandiff, p_val, lower, upper, reject])
+    
+    df = pd.DataFrame(results, columns=['group1', 'group2', 'meandiff', 'p-adj', 'lower', 'upper', 'reject'])
+    return df, "Scheffé"
+
+def perform_games_howell(data, factor, dependent_var, alpha):
+    """Perform Games-Howell test for unequal variances"""
+    groups = data[factor].unique()
+    combinations = [(g1, g2) for i, g1 in enumerate(groups) for g2 in groups[i+1:]]
+    
+    results = []
+    for g1, g2 in combinations:
+        # Get group data
+        group1 = data[data[factor] == g1][dependent_var]
+        group2 = data[data[factor] == g2][dependent_var]
+        
+        # Group stats
+        n1, n2 = len(group1), len(group2)
+        mean1, mean2 = group1.mean(), group2.mean()
+        var1, var2 = group1.var(), group2.var()
+        
+        # Mean difference
+        meandiff = mean1 - mean2
+        
+        # Welch-Satterthwaite degrees of freedom
+        df_num = (var1/n1 + var2/n2)**2
+        df_denom = (var1/n1)**2/(n1-1) + (var2/n2)**2/(n2-1)
+        df = df_num / df_denom if df_denom > 0 else np.inf
+        
+        # Standard error and t-statistic
+        se = np.sqrt(var1/n1 + var2/n2)
+        t_stat = meandiff / se
+        
+        # p-value and confidence interval
+        p_val = 2 * (1 - stats.t.cdf(abs(t_stat), df))
+        q_crit = stats.studentized_range.ppf(1-alpha, len(groups), df) / np.sqrt(2)
+        ci_margin = q_crit * se
+        lower = meandiff - ci_margin
+        upper = meandiff + ci_margin
+        
+        # Reject null if |t| > critical value
+        reject = abs(t_stat) > q_crit
+        
+        results.append([g1, g2, meandiff, p_val, lower, upper, reject])
+    
+    df = pd.DataFrame(results, columns=['group1', 'group2', 'meandiff', 'p-adj', 'lower', 'upper', 'reject'])
+    return df, "Games-Howell"
+
+def create_posthoc_analysis(data, factor, dependent_var, alpha, method='tukey'):
+    """Perform post-hoc analysis for a factor using the specified method"""
+    # Select the appropriate post-hoc test method
+    if method == 'bonferroni':
+        results, method_name = perform_bonferroni(data, factor, dependent_var, alpha)
+    elif method == 'scheffe':
+        results, method_name = perform_scheffe(data, factor, dependent_var, alpha)
+    elif method == 'games_howell':
+        results, method_name = perform_games_howell(data, factor, dependent_var, alpha)
+    else:  # Default to Tukey HSD
+        results, method_name = perform_tukey_hsd(data, factor, dependent_var, alpha)
+    
+    st.write(f"#### {method_name} Post-hoc Test Results")
+    st.write(results)
     
     # Create visualizations
     st.write(f"### Visualisasi Efek {factor}")
@@ -56,6 +180,13 @@ def create_tukey_analysis(data, factor, dependent_var, alpha):
         color=factor
     )
     st.plotly_chart(fig, use_container_width=True)
+    
+    return results
+
+# Keep the original create_tukey_analysis function for backward compatibility
+def create_tukey_analysis(data, factor, dependent_var, alpha):
+    """Perform Tukey HSD analysis for a factor (Legacy function)"""
+    return create_posthoc_analysis(data, factor, dependent_var, alpha, method='tukey')
 
 def create_docx_report(data, dependent_var, factor1, factor2, formatted_anova, effects_summary, p_values, eta_squared, alpha, model, conclusions):
     """Generate a Word document report for Two-Way ANOVA analysis."""
@@ -276,6 +407,24 @@ with st.sidebar:
     st.header("Pengaturan")
     alpha = st.slider("Tingkat alpha", 0.01, 0.10, 0.05, 0.01)
     show_assumptions = st.checkbox("Periksa asumsi ANOVA", True)
+    
+    # Add selection for post-hoc test method
+    posthoc_method = st.selectbox(
+        "Metode Post-hoc Test",
+        ['tukey', 'bonferroni', 'scheffe', 'games_howell'],
+        format_func=lambda x: {
+            'tukey': 'Tukey HSD (Equal variances)',
+            'bonferroni': 'Bonferroni (Conservative)',
+            'scheffe': 'Scheffé (Flexible contrasts)',
+            'games_howell': 'Games-Howell (Unequal variances)'
+        }[x],
+        help="""
+        - Tukey HSD: Standard post-hoc test for equal variances
+        - Bonferroni: More conservative test (controls family-wise error)
+        - Scheffé: Allows for complex comparisons between groups
+        - Games-Howell: Better for unequal variances between groups
+        """
+    )
 
 # Upload file CSV atau Excel
 uploaded_file = st.file_uploader("Unggah file CSV atau Excel Anda", type=["csv", "xlsx", "xls"])
@@ -632,17 +781,36 @@ if uploaded_file is not None:
                 
                 # Uji post-hoc untuk efek utama yang signifikan
                 st.write("## Uji Post-hoc")
-                
-                # Jalankan Tukey HSD untuk efek utama yang signifikan
+
+                with st.expander("Informasi tentang uji post-hoc"):
+                    st.markdown("""
+                    ### Panduan Memilih Uji Post-hoc
+
+                    Berbagai uji post-hoc memiliki karakteristik berbeda:
+
+                    | Uji Post-hoc | Kelebihan | Kekurangan | Disarankan Untuk |
+                    |--------------|-----------|------------|------------------|
+                    | **Tukey HSD** | Kekuatan statistik yang baik | Mengasumsikan variansi sama | Ukuran sampel sama dan variansi homogen |
+                    | **Bonferroni** | Sangat ketat dalam mengontrol Type I error | Bisa terlalu konservatif, kurang powerful | Dataset dengan banyak perbandingan |
+                    | **Scheffé** | Cocok untuk semua jenis perbandingan dan kontras | Kurang powerful dari Tukey | Pengujian kompleks dengan berbagai kontras |
+                    | **Games-Howell** | Tidak mengasumsikan variansi sama | Perhitungan lebih kompleks | Data dengan variansi tidak homogen |
+
+                    **Situasi khusus:**
+                    - Jika asumsi homogenitas variansi dilanggar, gunakan Games-Howell
+                    - Jika ada banyak perbandingan yang akan dilakukan, Bonferroni dapat membantu mengurangi false positives
+                    - Jika ukuran grup sangat tidak seimbang, Games-Howell juga merupakan pilihan yang baik
+                    """)
+
+                # Jalankan post-hoc test yang dipilih untuk efek utama yang signifikan
                 if p_values.iloc[0] < alpha:
-                    st.write(f"### Tukey HSD untuk {factor1}")
-                    create_tukey_analysis(data, factor1, dependent_var, alpha)
+                    st.write(f"### {factor1}")
+                    create_posthoc_analysis(data, factor1, dependent_var, alpha, method=posthoc_method)
                 else:
                     st.info(f"Faktor {factor1} tidak memiliki efek yang signifikan (p = {p_values.iloc[0]:.4f} > {alpha}).")
                 
                 if p_values.iloc[1] < alpha:
-                    st.write(f"### Tukey HSD untuk {factor2}")
-                    create_tukey_analysis(data, factor2, dependent_var, alpha)
+                    st.write(f"### {factor2}")
+                    create_posthoc_analysis(data, factor2, dependent_var, alpha, method=posthoc_method)
                 else:
                     st.info(f"Faktor {factor2} tidak memiliki efek yang signifikan (p = {p_values.iloc[1]:.4f} > {alpha}).")
                 
@@ -705,7 +873,7 @@ if uploaded_file is not None:
                 if p_values.iloc[1] < alpha:
                     conclusions.append(f"- **{factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1]):.4f}, η² = {eta_squared.iloc[1]:.4f}).")
                 else:
-                    conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1]):.4f}).")
+                    conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1])::.4f}).")
                 
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
