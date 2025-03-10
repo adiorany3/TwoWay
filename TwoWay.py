@@ -132,6 +132,63 @@ def create_docx_report(data, dependent_var, factor1, factor2, formatted_anova, e
     
     return docx_io
 
+def create_html_report(dependent_var, factor1, factor2, formatted_anova, effects_summary, p_values, eta_squared, alpha, model, conclusions):
+    """Generate an HTML report for Two-Way ANOVA analysis that can be opened in Word."""
+    
+    # Convert dataframes to HTML tables with bootstrap styling
+    anova_table_html = formatted_anova.to_html(index=True, classes="table table-striped")
+    effects_table_html = effects_summary.to_html(index=False, classes="table table-striped")
+    
+    # Format conclusions as list items
+    conclusions_html = "".join([f"<li>{c}</li>" for c in conclusions])
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Two-Way ANOVA Analysis Report</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; }}
+            h1 {{ color: #2C3E50; }}
+            h2 {{ color: #34495E; margin-top: 30px; }}
+            table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+            table, th, td {{ border: 1px solid #ddd; }}
+            th, td {{ padding: 12px; text-align: left; }}
+            th {{ background-color: #f2f2f2; }}
+            .footer {{ margin-top: 40px; text-align: center; font-size: 12px; color: #7F8C8D; }}
+        </style>
+    </head>
+    <body>
+        <h1>Two-Way ANOVA Analysis Report</h1>
+        <p>Generated on: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+        
+        <h2>Analysis Overview</h2>
+        <p><strong>Dependent Variable:</strong> {dependent_var}</p>
+        <p><strong>Factor 1:</strong> {factor1}</p>
+        <p><strong>Factor 2:</strong> {factor2}</p>
+        <p><strong>Significance level (α):</strong> {alpha}</p>
+        
+        <h2>ANOVA Results</h2>
+        {anova_table_html}
+        
+        <h2>Effect Sizes</h2>
+        {effects_table_html}
+        
+        <h2>Conclusions</h2>
+        <ul>
+            {conclusions_html}
+        </ul>
+        <p><strong>Model explains {model.rsquared:.2%} of the variation in {dependent_var}.</strong></p>
+        
+        <div class="footer">
+            <p>Generated using Two-Way ANOVA Analysis Tool | © {datetime.datetime.now().year} Galuh Adi Insani</p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return html
+
 # Set page configuration
 st.set_page_config(
     page_title="Analisis Two-Way ANOVA",
@@ -662,6 +719,30 @@ if uploaded_file is not None:
                     except Exception as e:
                         st.error(f"Gagal membuat dokumen Word: {str(e)}")
                         st.info("Pastikan library python-docx terinstal: pip install python-docx")
+
+                    # HTML export option (can be opened in Word)
+                    try:
+                        html_report = create_html_report(
+                            dependent_var, 
+                            factor1, 
+                            factor2, 
+                            formatted_anova, 
+                            effects_summary, 
+                            p_values, 
+                            eta_squared, 
+                            alpha, 
+                            model,
+                            conclusions
+                        )
+                        
+                        st.download_button(
+                            label="Unduh Laporan Lengkap (HTML)",
+                            data=html_report,
+                            file_name=f"anova_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                            mime="text/html"
+                        )
+                    except Exception as e:
+                        st.error(f"Gagal membuat laporan HTML: {str(e)}")
         else:
             # Memberikan saran untuk pengguna baru
             st.info("Pilih variabel dan klik tombol 'Jalankan Two-Way ANOVA' untuk melihat hasil analisis.")
