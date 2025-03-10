@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from scipy import stats
 import datetime
 import io
+from docx import Document
 
 # Add these functions before your main code
 
@@ -55,6 +56,81 @@ def create_tukey_analysis(data, factor, dependent_var, alpha):
         color=factor
     )
     st.plotly_chart(fig, use_container_width=True)
+
+def create_docx_report(data, dependent_var, factor1, factor2, formatted_anova, effects_summary, p_values, eta_squared, alpha, model, conclusions):
+    """Generate a Word document report for Two-Way ANOVA analysis."""
+    doc = Document()
+    
+    # Add title and date
+    doc.add_heading('Two-Way ANOVA Analysis Report', 0)
+    doc.add_paragraph(f'Generated on: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    
+    # Analysis overview
+    doc.add_heading('Analysis Overview', 1)
+    doc.add_paragraph(f'Dependent Variable: {dependent_var}')
+    doc.add_paragraph(f'Factor 1: {factor1}')
+    doc.add_paragraph(f'Factor 2: {factor2}')
+    doc.add_paragraph(f'Significance level (α): {alpha}')
+    doc.add_parraph(f'Sample size: {len(data)}')
+    
+    # ANOVA Table
+    doc.add_heading('ANOVA Results', 1)
+    
+    # Add ANOVA table
+    table = doc.add_table(rows=len(formatted_anova)+1, cols=len(formatted_anova.columns)+1)
+    table.style = 'Table Grid'
+    
+    # Add headers
+    headers = ['Factor'] + list(formatted_anova.columns)
+    for i, header in enumerate(headers):
+        table.cell(0, i).text = header
+    
+    # Add data
+    for i, (idx, row) in enumerate(formatted_anova.iterrows(), 1):
+        table.cell(i, 0).text = idx
+        for j, val in enumerate(row, 1):
+            table.cell(i, j).text = str(val)
+    
+    # Effect Sizes
+    doc.add_heading('Effect Sizes', 1)
+    
+    # Add effect size table
+    table = doc.add_table(rows=len(effects_summary)+1, cols=len(effects_summary.columns))
+    table.style = 'Table Grid'
+    
+    # Add headers
+    for i, header in enumerate(effects_summary.columns):
+        table.cell(0, i).text = header
+    
+    # Add data
+    for i, row in enumerate(effects_summary.values, 1):
+        for j, val in enumerate(row):
+            table.cell(i, j).text = str(val)
+    
+    # Conclusions
+    doc.add_heading('Conclusions', 1)
+    for conclusion in conclusions:
+        doc.add_paragraph(conclusion, style='List Bullet')
+    
+    doc.add_paragraph(f"Model explains {model.rsquared:.2%} of the variation in {dependent_var}.")
+    
+    # Add interaction note if significant
+    if p_values[2] < alpha:
+        doc.add_paragraph("Interaction Effect Note:", style='Intense Quote')
+        doc.add_paragraph("When an interaction is significant, the effect of one factor depends on the level of the other factor. In this case, the simple main effects should be interpreted with caution.")
+    
+    # Add footer
+    section = doc.sections[0]
+    footer = section.footer
+    footer_para = footer.paragraphs[0]
+    footer_para.text = f"Generated using Two-Way ANOVA Analysis Tool | © {datetime.datetime.now().year} Galuh Adi Insani"
+    
+    # Save to BytesIO object
+    docx_io = io.BytesIO()
+    doc.save(docx_io)
+    docx_io.seek(0)
+    
+    return docx_io
 
 # Set page configuration
 st.set_page_config(
@@ -533,7 +609,7 @@ if uploaded_file is not None:
 
                 # Create export options
                 st.write("## Ekspor Hasil")
-                export_col1, export_col2 = st.columns(2)
+                export_col1, export_col2, export_col3 = st.columns(3)
 
                 with export_col1:
                     # CSV export
@@ -559,6 +635,33 @@ if uploaded_file is not None:
                         file_name=f"anova_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
+
+                with export_col3:
+                    # Word document export
+                    try:
+                        docx_buffer = create_docx_report(
+                            data, 
+                            dependent_var, 
+                            factor1, 
+                            factor2, 
+                            formatted_anova, 
+                            effects_summary, 
+                            p_values, 
+                            eta_squared, 
+                            alpha, 
+                            model,
+                            conclusions
+                        )
+                        
+                        st.download_button(
+                            label="Unduh Laporan Lengkap (DOCX)",
+                            data=docx_buffer,
+                            file_name=f"anova_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
+                    except Exception as e:
+                        st.error(f"Gagal membuat dokumen Word: {str(e)}")
+                        st.info("Pastikan library python-docx terinstal: pip install python-docx")
         else:
             # Memberikan saran untuk pengguna baru
             st.info("Pilih variabel dan klik tombol 'Jalankan Two-Way ANOVA' untuk melihat hasil analisis.")
