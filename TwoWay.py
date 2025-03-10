@@ -192,6 +192,17 @@ def create_posthoc_analysis(data, factor, dependent_var, alpha, method='tukey'):
     )
     st.plotly_chart(fig, use_container_width=True)
     
+    # Add explanation for the boxplot
+    st.markdown(f"""
+    **Interpretasi Boxplot:**
+    - **Kotak (Box)**: Menunjukkan distribusi data dari kuartil pertama (Q1) hingga kuartil ketiga (Q3). Semakin tinggi kotak, semakin besar variasi data dalam kelompok.
+    - **Garis di tengah kotak**: Merepresentasikan nilai median (nilai tengah) dari {dependent_var} untuk setiap level {factor}.
+    - **Whiskers (garis vertikal)**: Menunjukkan rentang data di luar kuartil, tetapi masih dalam batas 1.5 IQR (Inter-Quartile Range).
+    - **Titik-titik di luar whiskers**: Data outlier atau nilai ekstrem.
+    
+    Perbandinkan median dan sebaran data antar kelompok. Jika boxplot memiliki sedikit overlap, perbedaan antar kelompok kemungkinan signifikan.
+    """)
+    
     # Bar plot with error bars
     summary_stats = data.groupby(factor, observed=True)[dependent_var].agg(['mean', 'std']).reset_index()
     
@@ -204,6 +215,17 @@ def create_posthoc_analysis(data, factor, dependent_var, alpha, method='tukey'):
         color=factor
     )
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Add explanation for the bar plot
+    st.markdown(f"""
+    **Interpretasi Bar Plot dengan Error Bars:**
+    - **Tinggi batang**: Menunjukkan nilai rata-rata {dependent_var} untuk setiap level {factor}.
+    - **Error bars**: Menunjukkan standar deviasi, mengindikasikan seberapa besar variasi data dari nilai rata-rata.
+    - **Perbedaan tinggi batang**: Semakin besar perbedaan tinggi antar batang, semakin besar perbedaan rata-rata antar kelompok.
+    
+    Error bars yang tidak tumpang tindih sering mengindikasikan perbedaan yang signifikan antar kelompok, 
+    meskipun ini bukan konfirmasi statistik yang pasti (gunakan hasil post-hoc test untuk konfirmasi signifikansi).
+    """)
     
     return results
 
@@ -767,6 +789,19 @@ if uploaded_file is not None:
                 fig.update_layout(height=500)
                 st.plotly_chart(fig, use_container_width=True)
                 
+                # Add explanation for effect size visualization
+                st.markdown("""
+                **Interpretasi Visualisasi Ukuran Efek:**
+                - **Tinggi batang**: Menunjukkan besarnya ukuran efek (Eta²) untuk setiap faktor dan interaksinya.
+                - **Warna batang**: Hijau menandakan efek yang signifikan secara statistik, sementara abu-abu menandakan efek yang tidak signifikan.
+                - **Nilai Eta²**: 
+                  - < 0.06: Efek kecil (pengaruh faktor minimal terhadap variabel dependen)
+                  - 0.06 - 0.14: Efek sedang (pengaruh faktor moderat)
+                  - ≥ 0.14: Efek besar (pengaruh faktor substansial)
+
+                Faktor atau interaksi dengan nilai Eta² tertinggi memiliki kontribusi terbesar dalam menjelaskan variasi pada variabel dependen.
+                """)
+                
                 # Tambahkan ringkasan model dengan tab
                 st.write("### Ringkasan Model")
                 tabs = st.tabs(["Koefisien Model", "Statistik Model", "Ringkasan Lengkap"])
@@ -870,6 +905,21 @@ if uploaded_file is not None:
                     
                     st.plotly_chart(fig, use_container_width=True)
                     
+                    # Add detailed explanation for interaction plot
+                    st.markdown(f"""
+                    **Interpretasi Plot Interaksi:**
+                    - **Sumbu X**: Menunjukkan berbagai level dari {factor1}.
+                    - **Sumbu Y**: Menunjukkan rata-rata {dependent_var}.
+                    - **Garis berwarna**: Masing-masing merepresentasikan level berbeda dari {factor2}.
+                    
+                    **Pola interaksi yang perlu diperhatikan:**
+                    1. **Garis sejajar**: Jika garis relatif sejajar, interaksi kemungkinan lemah. Ini berarti efek {factor1} konsisten di setiap level {factor2}.
+                    2. **Garis bersilangan**: Menunjukkan interaksi yang kuat. Efek {factor1} berbeda-beda tergantung pada level {factor2}.
+                    3. **Garis divergen/konvergen**: Semakin tidak sejajar garisnya, semakin kuat interaksinya.
+                    
+                    Interaksi signifikan berarti efek satu faktor tergantung pada level faktor lainnya. Contoh: jika efek {factor1} pada {dependent_var} berbeda untuk setiap level {factor2}, maka interpretasi efek utama harus dilakukan dengan hati-hati.
+                    """)
+                    
                     # Heatmap interaksi
                     pivot_data = interaction_data.pivot(index=factor1, columns=factor2, values=dependent_var)
                     
@@ -881,11 +931,19 @@ if uploaded_file is not None:
                     
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    st.write("**Menginterpretasikan Hasil Interaksi:**")
-                    st.write("""
-                        - Jika garis pada plot interaksi sejajar, efek dari satu faktor konsisten di semua level faktor lainnya.
-                        - Jika garis bersilangan atau tidak sejajar, ada interaksi yang signifikan. Ini berarti efek satu faktor bergantung pada level faktor lainnya.
-                        - Heatmap menunjukkan kombinasi kedua faktor yang menghasilkan nilai tertinggi dan terendah pada variabel dependen.
+                    # Add explanation for heatmap
+                    st.markdown(f"""
+                    **Interpretasi Heatmap Interaksi:**
+                    - **Sumbu X**: Menunjukkan level-level dari {factor2}.
+                    - **Sumbu Y**: Menunjukkan level-level dari {factor1}.
+                    - **Warna sel**: Intensitas warna menunjukkan nilai rata-rata {dependent_var}. Warna lebih gelap/terang menunjukkan nilai yang lebih tinggi/rendah.
+                    
+                    **Cara membaca heatmap:**
+                    - **Gradien warna yang seragam**: Jika perubahan warna teratur dari satu arah ke arah lain, kemungkinan tidak ada interaksi yang kuat.
+                    - **Pola warna tidak teratur**: Menunjukkan interaksi yang signifikan di mana kombinasi tertentu dari kedua faktor menghasilkan efek yang tidak dapat diprediksi hanya dari efek utama masing-masing faktor.
+                    - **"Hot spots" (area sangat terang/gelap)**: Kombinasi faktor yang menghasilkan nilai ekstrem pada variabel dependen.
+                    
+                    Heatmap membantu mengidentifikasi kombinasi optimal dari kedua faktor untuk memaksimalkan atau meminimalkan {dependent_var}.
                     """)
                 else:
                     st.info(f"Interaksi antara {factor1} dan {factor2} tidak signifikan (p = {p_values.iloc[2]:.4f} > {alpha}).")
@@ -1163,6 +1221,16 @@ else:
         )
         st.plotly_chart(fig, use_container_width=True)
         
+        # Add explanation for the sample boxplot
+        st.markdown("""
+        **Interpretasi Boxplot Contoh:**
+        - **Posisi boxplot**: Menunjukkan distribusi berat badan untuk setiap kombinasi Jenis Pakan dan Breed Sapi.
+        - **Perbandingan antar grup**: Perhatikan bagaimana berat badan bervariasi antara kombinasi pakan dan breed yang berbeda.
+        - **Pola terlihat**: Simental secara konsisten memiliki berat badan lebih tinggi dari breed lain, dan pakan campuran cenderung menghasilkan berat badan yang lebih tinggi.
+
+        Boxplot ini menunjukkan informasi awal tentang perbedaan antar grup yang akan dianalisis dengan Two-Way ANOVA.
+        """)
+        
         # Tampilkan plot interaksi
         interaction_data = example_data.groupby(['JenisPakan', 'BreedSapi'])['BeratBadan'].mean().reset_index()
         fig = px.line(
@@ -1175,16 +1243,14 @@ else:
         )
         st.plotly_chart(fig, use_container_width=True)
         
+        # Add explanation for the sample interaction plot
         st.markdown("""
-        ### Hasil yang Diharapkan
-        
-        Dengan dataset ini, Anda dapat mengamati:
-        
-        1. **Efek utama Jenis Pakan**: Pakan campuran menghasilkan berat badan lebih tinggi dibanding jenis pakan lainnya
-        2. **Efek utama Breed Sapi**: Simental memiliki berat badan tertinggi, diikuti Limousin, kemudian Brahman
-        3. **Efek interaksi**: Kombinasi pakan campuran dengan breed Simental memberikan hasil terbaik dengan peningkatan yang lebih signifikan dibandingkan kombinasi lainnya
-        
-        Data ini menunjukkan kondisi riil di lapangan dimana pemilihan jenis pakan yang tepat untuk breed tertentu dapat mengoptimalkan hasil peternakan. Cobalah menganalisis dataset ini untuk melihat signifikansi statistik dari perbedaan yang teramati!
+        **Interpretasi Plot Interaksi Contoh:**
+        - **Garis tidak sejajar**: Menunjukkan adanya interaksi antara jenis pakan dan breed sapi.
+        - **Kemiringan garis**: Menggambarkan seberapa besar pengaruh jenis pakan pada masing-masing breed.
+        - **Jarak vertikal antar garis**: Menunjukkan perbedaan berat badan antar breed untuk setiap jenis pakan.
+
+        Dalam contoh ini, terlihat bahwa semua breed merespon positif terhadap pakan campuran, tetapi Simental menunjukkan peningkatan yang lebih besar dibandingkan breed lainnya - ini mengindikasikan interaksi. Two-Way ANOVA akan menguji apakah interaksi ini signifikan secara statistik.
         """)
 # Add this import at the top with the other imports
 import io
