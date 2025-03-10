@@ -519,7 +519,7 @@ if uploaded_file is not None:
                     conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[1]):.4f}).")
                 
                 if p_values[2] < alpha:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2])::.4f}, η² = {eta_squared[2]:.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2]):.4f}, η² = {eta_squared[2]:.4f}).")
                 else:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values[2]):.4f}).")
                 
