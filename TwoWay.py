@@ -21,7 +21,7 @@ st.set_page_config(
 st.title('📊 Analisis Two-Way ANOVA')
 st.markdown("""
     Aplikasi ini membantu Anda melakukan analisis Two-Way ANOVA pada data Anda.
-    Upload file CSV, pilih variabel yang ingin dianalisis, dan dapatkan hasil lengkap.
+    Upload file CSV atau Excel, pilih variabel yang ingin dianalisis, dan dapatkan hasil lengkap.
 """)
 
 # Hide default Streamlit elements
@@ -52,12 +52,18 @@ with st.sidebar:
     alpha = st.slider("Tingkat alpha", 0.01, 0.10, 0.05, 0.01)
     show_assumptions = st.checkbox("Periksa asumsi ANOVA", True)
 
-# Upload file CSV
-uploaded_file = st.file_uploader("Unggah file CSV Anda", type=["csv"])
+# Upload file CSV atau Excel
+uploaded_file = st.file_uploader("Unggah file CSV atau Excel Anda", type=["csv", "xlsx", "xls"])
 
 if uploaded_file is not None:
     try:
-        data = pd.read_csv(uploaded_file)
+        # Determine file type and read accordingly
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        
+        if file_extension == 'csv':
+            data = pd.read_csv(uploaded_file)
+        elif file_extension in ['xlsx', 'xls']:
+            data = pd.read_excel(uploaded_file)
         
         # Tampilkan informasi data
         col1, col2 = st.columns([2, 1])
@@ -529,7 +535,7 @@ if uploaded_file is not None:
         st.write("3. Pastikan tidak ada nilai yang hilang (NA) di kolom yang dianalisis")
 else:
     # Tampilkan instruksi dan contoh saat tidak ada file yang diunggah
-    st.info("Silakan unggah file CSV yang berisi data untuk analisis Two-Way ANOVA.")
+    st.info("Silakan unggah file CSV atau Excel yang berisi data untuk analisis Two-Way ANOVA.")
     
     # Menambahkan section contoh data
     with st.expander("Contoh format data yang dibutuhkan"):
