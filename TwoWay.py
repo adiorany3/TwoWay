@@ -34,21 +34,45 @@ def perform_bonferroni(data, factor, dependent_var, alpha):
     results = mc.allpairtest(stats.ttest_ind, method='bonf')[0]
     # Convert to DataFrame similar to Tukey output
     df = pd.DataFrame(columns=['group1', 'group2', 'meandiff', 'p-adj', 'lower', 'upper', 'reject'])
+    
     for row in range(len(results.data)):
-        g1, g2 = results.data[row][0]
-        stat, p_adj, reject = results.data[row][1:]
+        # The issue is likely here - results.data structure might not match our expectations
+        # Let's make this more robust by handling different structures
+        pair_data = results.data[row]
+        
+        # Extract group names
+        if isinstance(pair_data[0], tuple) and len(pair_data[0]) == 2:
+            g1, g2 = pair_data[0]
+        else:
+            # Handle unexpected structure
+            st.warning(f"Unexpected data structure in Bonferroni test, row {row}")
+            continue
+            
+        # Extract test statistics - ensure we get exactly what we need
+        if len(pair_data) >= 4:  # Should have at least 4 elements [groups, stat, p-value, reject]
+            stat = pair_data[1]
+            p_adj = pair_data[2]
+            reject = pair_data[3]
+        else:
+            # Handle unexpected structure
+            st.warning(f"Insufficient data in Bonferroni test results, row {row}")
+            continue
+            
         # Calculate mean difference and confidence interval
         group1_mean = data[data[factor] == g1][dependent_var].mean()
         group2_mean = data[data[factor] == g2][dependent_var].mean()
         meandiff = group1_mean - group2_mean
+        
         # Approximate CI - proper calculation would be more complex
         t_val = stats.t.ppf(1 - alpha/2, len(data) - 2)
         pooled_sd = np.sqrt(((data[data[factor] == g1][dependent_var].var() * (len(data[data[factor] == g1]) - 1) + 
-                             data[data[factor] == g2][dependent_var].var() * (len(data[data[factor] == g2]) - 1)) / 
-                             (len(data[data[factor] == g1]) + len(data[data[factor] == g2]) - 2)))
+                            data[data[factor] == g2][dependent_var].var() * (len(data[data[factor] == g2]) - 1)) / 
+                            (len(data[data[factor] == g1]) + len(data[data[factor] == g2]) - 2)))
         se = pooled_sd * np.sqrt(1/len(data[data[factor] == g1]) + 1/len(data[data[factor] == g2]))
         margin = t_val * se
+        
         df.loc[row] = [g1, g2, meandiff, p_adj, meandiff - margin, meandiff + margin, reject]
+        
     return df, "Bonferroni"
 
 def perform_scheffe(data, factor, dependent_var, alpha):
@@ -871,7 +895,7 @@ if uploaded_file is not None:
                     conclusions.append(f"- **{factor1}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[0]):.4f}).")
                 
                 if p_values.iloc[1] < alpha:
-                    conclusions.append(f"- **{factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1]):.4f}, η² = {eta_squared.iloc[1]:.4f}).")
+                    conclusions.append(f"- **{factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1])::.4f}, η² = {eta_squared.iloc[1]:.4f}).")
                 else:
                     conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1])::.4f}).")
                 
