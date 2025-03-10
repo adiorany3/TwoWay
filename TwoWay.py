@@ -103,6 +103,16 @@ def perform_scheffe(data, factor, dependent_var, alpha):
     
     # Get all group combinations
     groups = data[factor].unique()
+    combinations = [(g1, g2) for i, g1 in enumerate(groups) for g2 in groups[i+1:]]
+    
+    # Calculate Scheffé critical value
+    k = len(groups)  # number of groups
+    f_crit = stats.f.ppf(1-alpha, k-1, df_error) * (k-1)
+    
+    # Calculate pairwise comparisons
+    results = []
+    for g1, g2 in combinations:
+        n1 = len(data[data[factor] == g1])
         n2 = len(data[data[factor] == g2])
         mean1 = data[data[factor] == g1][dependent_var].mean()
         mean2 = data[data[factor] == g2][dependent_var].mean()
