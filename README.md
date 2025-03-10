@@ -1,57 +1,103 @@
-TwoWay ANOVA Analysis Tool
-A Streamlit web application for performing Two-Way ANOVA statistical analysis on your data with comprehensive visualizations and exportable reports.
 
-Overview
-This application helps researchers, students, and professionals analyze the influence of two categorical factors on a numerical dependent variable using Two-Way ANOVA. The tool provides interactive visualizations, effect size calculations, post-hoc tests, and exportable reports to aid in statistical analysis and interpretation.
+## Features
 
-Features
-Data Import: Upload CSV or Excel files
-Data Validation: Automatic checking for appropriate data types and missing values
-ANOVA Analysis: Complete Two-Way ANOVA calculation with interaction effects
-Effect Size Metrics: Eta-squared and partial eta-squared calculations
-Assumption Testing: Normality and homogeneity of variance checks
-Post-hoc Analysis: Tukey HSD tests for significant factors
-Interactive Visualizations:
-Boxplots and bar charts for main effects
-Interaction plots and heatmaps for interaction effects
-Effect size visualizations
-Exportable Results:
-CSV export
-Excel reports with multiple sheets
-Word document reports
-HTML reports
-Installation
-Clone this repository or download the TwoWay.py file
-Install the required dependencies:
-Usage
-Run the application using Streamlit:
+- **Data Upload**: Support for CSV and Excel files
+- **Exploratory Data Analysis**: Preview data and get basic information
+- **ANOVA Analysis**: Full Two-Way ANOVA statistical tests
+- **Assumption Testing**: Checks for normality and homogeneity of variance 
+- **Post-hoc Testing**: Tukey HSD for significant factors
+- **Effect Size Calculation**: Eta-squared and Partial Eta-squared
+- **Rich Visualizations**:
+  - Boxplots for main effects
+  - Interaction plots
+  - Effect size visualizations
+  - Heatmaps for interaction effects
+- **Export Options**:
+  - CSV tables
+  - Excel workbook with multiple sheets
+  - Word document reports
+  - HTML reports
+- **Sample Data**: Includes example dataset for demonstration
 
-Then open your web browser to the URL displayed in the terminal (typically http://localhost:8501).
+## Installation
 
-Workflow
-Upload your CSV or Excel file containing your data
-Select your dependent variable (numeric) and two factors (categorical)
-Set the alpha level and other options
-Click "Run Two-Way ANOVA" to perform the analysis
-Explore the results including ANOVA table, effect sizes, and visualizations
-Export your results in your preferred format
-Example Data
-The application includes an example dataset about cattle weight based on feed type and breed to demonstrate Two-Way ANOVA analysis. This example can be downloaded directly from the interface when no file is uploaded.
+```bash
+# Clone the repository
+git clone https://github.com/username/TwoWay.git
+cd TwoWay
 
-Requirements
-Python 3.6+
-Streamlit
-Pandas
-NumPy
-Statsmodels
-Matplotlib
-Seaborn
-Plotly
-SciPy
-Python-docx
-OpenPyXL
-Author
-Developed by Galuh Adi Insani
+# Install required packages
+pip install -r requirements.txt
+```
 
-License
-All rights reserved.
+## Requirements
+
+Create a `requirements.txt` file with these dependencies:
+
+```
+streamlit
+pandas
+numpy
+statsmodels
+matplotlib
+seaborn
+plotly
+scipy
+python-docx
+openpyxl
+```
+
+## Usage
+
+1. Run the Streamlit application:
+   ```bash
+   streamlit run TwoWay.py
+   ```
+
+2. Open your browser at the URL provided (typically http://localhost:8501)
+
+3. Upload your CSV or Excel file
+
+4. Select your dependent variable and two factors
+
+5. Click "Jalankan Two-Way ANOVA" to perform the analysis
+
+## Example Data Format
+
+Your data should include:
+- One continuous dependent variable (numeric)
+- Two categorical independent variables (factors)
+
+Example structure:
+```
+BeratBadan,JenisPakan,BreedSapi
+285,Konsentrat,Brahman
+290,Konsentrat,Brahman
+310,Konsentrat,Limousin
+325,Konsentrat,Simental
+270,Hijauan,Brahman
+298,Hijauan,Limousin
+...
+```
+
+## Interpreting Results
+
+The application provides comprehensive output to interpret your Two-Way ANOVA results:
+
+1. **ANOVA Table**: Shows test statistics, F-values, and p-values
+2. **Effect Sizes**: Indicates the magnitude of effects (small, medium, large)
+3. **Post-hoc Tests**: Pairwise comparisons when main effects are significant
+4. **Interaction Analysis**: Visualizations to understand how factors interact
+5. **Conclusions**: Automatically generated interpretations based on statistical results
+
+## Screenshots
+
+*(Add screenshots of the application here)*
+
+## About
+
+This Two-Way ANOVA Analysis Tool was developed by [Galuh Adi Insani](https://www.linkedin.com/in/galuh-adi-insani-1aa0a5105/).
+
+## License
+
+All rights reserved © Galuh Adi Insani
