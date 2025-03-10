@@ -681,9 +681,32 @@ if uploaded_file is not None:
                 with export_col2:
                     # Excel export option
                     excel_buffer = io.BytesIO()
-                    with pd.ExcelWriter(exel_buffer) as writer:
+                    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                         formatted_anova.to_excel(writer, sheet_name="ANOVA Table", index=True)
                         effects_summary.to_excel(writer, sheet_name="Effect Sizes", index=False)
+                        
+                        # Add model statistics
+                        stats_df = pd.DataFrame({
+                            'Metrik': ['R²', 'R² Disesuaikan', 'F-statistic', 'p-value', 'Log-Likelihood', 'AIC', 'BIC'],
+                            'Nilai': [
+                                f"{model.rsquared:.4f}",
+                                f"{model.rsquared_adj:.4f}",
+                                f"{model.fvalue:.4f}",
+                                f"{model.f_pvalue:.4e}" if model.f_pvalue < 0.0001 else f"{model.f_pvalue:.4f}",
+                                f"{model.llf:.4f}",
+                                f"{model.aic:.4f}",
+                                f"{model.bic:.4f}"
+                            ]
+                        })
+                        stats_df.to_excel(writer, sheet_name="Model Statistics", index=False)
+                        
+                        # Add summary info
+                        summary_info = pd.DataFrame({
+                            'Item': ['Dependent Variable', 'Factor 1', 'Factor 2', 'Alpha', 'Sample Size', 'Date'],
+                            'Value': [dependent_var, factor1, factor2, str(alpha), str(len(data)), 
+                                     datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+                        })
+                        summary_info.to_excel(writer, sheet_name="Analysis Info", index=False)
                         
                     excel_data = excel_buffer.getvalue()
                     st.download_button(
