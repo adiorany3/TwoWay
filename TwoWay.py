@@ -404,6 +404,13 @@ st.markdown("""
     Upload file CSV atau Excel, pilih variabel yang ingin dianalisis, dan dapatkan hasil lengkap.
 """)
 
+# Add privacy notice
+st.info("""
+    **🔒 Pemberitahuan Privasi:** 
+    Semua analisis dilakukan secara lokal di dalam browser Anda. Data yang Anda unggah tidak akan tersimpan di server 
+    kami atau dibagikan kepada pihak ketiga. Kami berkomitmen untuk menjaga privasi data Anda.
+""")
+
 # Hide default Streamlit elements
 hide_st_style = """
         <style>
@@ -902,7 +909,7 @@ if uploaded_file is not None:
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
                 else:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2])::.4f}).")
                 
                 for conclusion in conclusions:
                     st.markdown(conclusion)
