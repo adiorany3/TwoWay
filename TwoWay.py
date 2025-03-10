@@ -29,65 +29,50 @@ def perform_tukey_hsd(data, factor, dependent_var, alpha):
     return results, "Tukey HSD"
 
 def perform_bonferroni(data, factor, dependent_var, alpha):
-    """Perform Bonferroni correction"""
-    mc = MultiComparison(data[dependent_var], data[factor])
-    result_obj = mc.allpairtest(stats.ttest_ind, method='bonf')
+    """Perform Bonferroni correction by running t-tests manually"""
+    groups = data[factor].unique()
+    combinations = [(g1, g2) for i, g1 in enumerate(groups) for g2 in groups[i+1:]]
     
-    # Convert to DataFrame similar to Tukey output
-    df = pd.DataFrame(columns=['group1', 'group2', 'meandiff', 'p-adj', 'lower', 'upper', 'reject'])
-    
-    # Extract data from the MultiComparison result object
-    raw_data = result_obj[0].data
-    pvalues = result_obj[0].pvalues
-    reject = result_obj[0].reject
-    
-    # Get the group comparison pairs
-    rows = []
-    for i, (group1, group2) in enumerate(mc.pairindices):
-        g1 = mc.groupsunique[group1]
-        g2 = mc.groupsunique[group2]
+    results = []
+    for g1, g2 in combinations:
+        # Get group data
+        group1 = data[data[factor] == g1][dependent_var]
+        group2 = data[data[factor] == g2][dependent_var]
         
-        # Calculate mean difference
-        mean1 = data[data[factor] == g1][dependent_var].mean()
-        mean2 = data[data[factor] == g2][dependent_var].mean()
+        # Run t-test
+        t_stat, p_uncorrected = stats.ttest_ind(group1, group2)
+        
+        # Apply Bonferroni correction
+        p_adj = min(p_uncorrected * len(combinations), 1.0)
+        
+        # Mean difference
+        mean1, mean2 = group1.mean(), group2.mean()
         meandiff = mean1 - mean2
         
-        # Calculate confidence intervals
-        n1 = len(data[data[factor] == g1])
-        n2 = len(data[data[factor] == g2])
-        
-        # Calculate pooled standard deviation
-        var1 = data[data[factor] == g1][dependent_var].var()
-        var2 = data[data[factor] == g2][dependent_var].var()
+        # Calculate confidence interval
+        n1, n2 = len(group1), len(group2)
         df_pooled = n1 + n2 - 2
         
+        # Pooled standard deviation
+        var1, var2 = group1.var(), group2.var()
         pooled_sd = np.sqrt(((n1-1) * var1 + (n2-1) * var2) / df_pooled)
         
         # Standard error
         se = pooled_sd * np.sqrt(1/n1 + 1/n2)
         
-        # Critical value adjusted for Bonferroni
-        t_crit = stats.t.ppf(1 - alpha/(2*len(mc.pairindices)), df_pooled)
+        # Critical t-value adjusted for Bonferroni
+        t_crit = stats.t.ppf(1 - alpha/(2*len(combinations)), df_pooled)
         
         # Confidence interval
         lower = meandiff - t_crit * se
         upper = meandiff + t_crit * se
         
-        # Add to results
-        rows.append({
-            'group1': g1, 
-            'group2': g2, 
-            'meandiff': meandiff,
-            'p-adj': pvalues[i] if i < len(pvalues) else np.nan,
-            'lower': lower,
-            'upper': upper,
-            'reject': reject[i] if i < len(reject) else np.nan
-        })
+        # Reject null if adjusted p-value < alpha
+        reject = p_adj < alpha
+        
+        results.append([g1, g2, meandiff, p_adj, lower, upper, reject])
     
-    # Create DataFrame from rows
-    if rows:
-        df = pd.DataFrame(rows)
-    
+    df = pd.DataFrame(results, columns=['group1', 'group2', 'meandiff', 'p-adj', 'lower', 'upper', 'reject'])
     return df, "Bonferroni"
 
 def perform_scheffe(data, factor, dependent_var, alpha):
@@ -912,7 +897,7 @@ if uploaded_file is not None:
                 if p_values.iloc[1] < alpha:
                     conclusions.append(f"- **{factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1]):.4f}, η² = {eta_squared.iloc[1]:.4f}).")
                 else:
-                    conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1]):.4f}).")
+                    conclusions.append(f"- **{factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[1])::.4f}).")
                 
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
