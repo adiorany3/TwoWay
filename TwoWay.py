@@ -724,6 +724,8 @@ else:
         
         Data ini menunjukkan kondisi riil di lapangan dimana pemilihan jenis pakan yang tepat untuk breed tertentu dapat mengoptimalkan hasil peternakan. Cobalah menganalisis dataset ini untuk melihat signifikansi statistik dari perbedaan yang teramati!
         """)
+# Add this import at the top with the other imports
+import io
 
 # Sebelum bagian footer (sekitar baris 500)
 # Dapatkan tahun saat ini untuk footer
