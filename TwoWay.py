@@ -31,53 +31,63 @@ def perform_tukey_hsd(data, factor, dependent_var, alpha):
 def perform_bonferroni(data, factor, dependent_var, alpha):
     """Perform Bonferroni correction"""
     mc = MultiComparison(data[dependent_var], data[factor])
-    results = mc.allpairtest(stats.ttest_ind, method='bonf')[0]
+    result_obj = mc.allpairtest(stats.ttest_ind, method='bonf')
+    
     # Convert to DataFrame similar to Tukey output
     df = pd.DataFrame(columns=['group1', 'group2', 'meandiff', 'p-adj', 'lower', 'upper', 'reject'])
     
-    # Add this at the beginning of the perform_bonferroni function to debug
-    for row in range(len(results.data)):
-        st.write(f"Row {row} data structure: {results.data[row]}")
-        st.write(f"Type: {type(results.data[row])}, Length: {len(results.data[row])}")
-
-    for row in range(len(results.data)):
-        # The issue is likely here - results.data structure might not match our expectations
-        # Let's make this more robust by handling different structures
-        pair_data = results.data[row]
+    # Extract data from the MultiComparison result object
+    raw_data = result_obj[0].data
+    pvalues = result_obj[0].pvalues
+    reject = result_obj[0].reject
+    
+    # Get the group comparison pairs
+    rows = []
+    for i, (group1, group2) in enumerate(mc.pairindices):
+        g1 = mc.groupsunique[group1]
+        g2 = mc.groupsunique[group2]
         
-        # Extract group names
-        if isinstance(pair_data[0], tuple) and len(pair_data[0]) == 2:
-            g1, g2 = pair_data[0]
-        else:
-            # Handle unexpected structure
-            st.warning(f"Unexpected data structure in Bonferroni test, row {row}")
-            continue
-            
-        # Extract test statistics - ensure we get exactly what we need
-        if len(pair_data) >= 4:  # Should have at least 4 elements [groups, stat, p-value, reject]
-            stat = pair_data[1]
-            p_adj = pair_data[2]
-            reject = pair_data[3]
-        else:
-            # Handle unexpected structure
-            st.warning(f"Insufficient data in Bonferroni test results, row {row}")
-            continue
-            
-        # Calculate mean difference and confidence interval
-        group1_mean = data[data[factor] == g1][dependent_var].mean()
-        group2_mean = data[data[factor] == g2][dependent_var].mean()
-        meandiff = group1_mean - group2_mean
+        # Calculate mean difference
+        mean1 = data[data[factor] == g1][dependent_var].mean()
+        mean2 = data[data[factor] == g2][dependent_var].mean()
+        meandiff = mean1 - mean2
         
-        # Approximate CI - proper calculation would be more complex
-        t_val = stats.t.ppf(1 - alpha/2, len(data) - 2)
-        pooled_sd = np.sqrt(((data[data[factor] == g1][dependent_var].var() * (len(data[data[factor] == g1]) - 1) + 
-                            data[data[factor] == g2][dependent_var].var() * (len(data[data[factor] == g2]) - 1)) / 
-                            (len(data[data[factor] == g1]) + len(data[data[factor] == g2]) - 2)))
-        se = pooled_sd * np.sqrt(1/len(data[data[factor] == g1]) + 1/len(data[data[factor] == g2]))
-        margin = t_val * se
+        # Calculate confidence intervals
+        n1 = len(data[data[factor] == g1])
+        n2 = len(data[data[factor] == g2])
         
-        df.loc[row] = [g1, g2, meandiff, p_adj, meandiff - margin, meandiff + margin, reject]
+        # Calculate pooled standard deviation
+        var1 = data[data[factor] == g1][dependent_var].var()
+        var2 = data[data[factor] == g2][dependent_var].var()
+        df_pooled = n1 + n2 - 2
         
+        pooled_sd = np.sqrt(((n1-1) * var1 + (n2-1) * var2) / df_pooled)
+        
+        # Standard error
+        se = pooled_sd * np.sqrt(1/n1 + 1/n2)
+        
+        # Critical value adjusted for Bonferroni
+        t_crit = stats.t.ppf(1 - alpha/(2*len(mc.pairindices)), df_pooled)
+        
+        # Confidence interval
+        lower = meandiff - t_crit * se
+        upper = meandiff + t_crit * se
+        
+        # Add to results
+        rows.append({
+            'group1': g1, 
+            'group2': g2, 
+            'meandiff': meandiff,
+            'p-adj': pvalues[i] if i < len(pvalues) else np.nan,
+            'lower': lower,
+            'upper': upper,
+            'reject': reject[i] if i < len(reject) else np.nan
+        })
+    
+    # Create DataFrame from rows
+    if rows:
+        df = pd.DataFrame(rows)
+    
     return df, "Bonferroni"
 
 def perform_scheffe(data, factor, dependent_var, alpha):
@@ -93,16 +103,6 @@ def perform_scheffe(data, factor, dependent_var, alpha):
     
     # Get all group combinations
     groups = data[factor].unique()
-    combinations = [(g1, g2) for i, g1 in enumerate(groups) for g2 in groups[i+1:]]
-    
-    # Calculate Scheffé critical value
-    k = len(groups)  # number of groups
-    f_crit = stats.f.ppf(1-alpha, k-1, df_error) * (k-1)
-    
-    # Calculate pairwise comparisons
-    results = []
-    for g1, g2 in combinations:
-        n1 = len(data[data[factor] == g1])
         n2 = len(data[data[factor] == g2])
         mean1 = data[data[factor] == g1][dependent_var].mean()
         mean2 = data[data[factor] == g2][dependent_var].mean()
@@ -907,7 +907,7 @@ if uploaded_file is not None:
                 if p_values.iloc[2] < alpha:
                     conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}, η² = {eta_squared.iloc[2]:.4f}).")
                 else:
-                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2])::.4f}).")
+                    conclusions.append(f"- **Interaksi antara {factor1} dan {factor2}** tidak memiliki pengaruh yang signifikan terhadap {dependent_var} (p = {float(p_values.iloc[2]):.4f}).")
                 
                 for conclusion in conclusions:
                     st.markdown(conclusion)
