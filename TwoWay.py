@@ -248,7 +248,7 @@ def create_docx_report(data, dependent_var, factor1, factor2, formatted_anova, e
     
     # Add title and date
     doc.add_heading('Two-Way ANOVA Analysis Report', 0)
-    doc.add_paragraph(f'Generated on: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    doc.add_paragraph(f'Generated on: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} (UTC 0)')
     
     # Analysis overview
     doc.add_heading('Analysis Overview', 1)
